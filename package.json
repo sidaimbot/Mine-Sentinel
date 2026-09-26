@@ -1,0 +1,39 @@
+{
+  "name": "mine-sentinel",
+  "version": "0.1.0",
+  "description": "3D Underground Mining Safety Monitoring System",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "npx http-server . -p 8000 -c-1 -o /public/",
+    "dev:py": "python tools/serve.py 8000",
+    "serve": "npx http-server . -p 8000 -c-1",
+    "test": "node --experimental-modules test/runner.js"
+  },
+  "keywords": [
+    "three.js",
+    "3d",
+    "game",
+    "mining",
+    "safety",
+    "simulation",
+    "webgl"
+  ],
+  "author": "Claude Haiku 4.5",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "devDependencies": {},
+  "dependencies": {
+    "three": "^r128"
+  },
+  "cdn": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+  },
+  "notes": {
+    "build": "No build step required. Project uses ES6 modules loaded directly in browser.",
+    "three-import": "THREE.js is loaded via CDN importmap in public/index.html for zero-config setup.",
+    "deployment": "Simply deploy public/ folder to any static hosting (GitHub Pages, Netlify, etc.)"
+  }
+}
