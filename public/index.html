@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Mine Sentinel - Underground mine hazard simulator">
+  <title>MINE SENTINEL</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/hud.css">
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+    }
+  }
+  </script>
+</head>
+
+<body>
+  <div id="gameContainer"></div>
+
+  <div id="fxVignette"></div>
+  <div id="fxDanger"></div>
+
+  <!-- START -->
+  <div id="startScreen">
+    <div class="start-grid"></div>
+    <div class="start-panel">
+      <div class="start-small">AI SAFETY COPILOT / UNDERGROUND NETWORK</div>
+      <div class="start-title">MINE SENTINEL<span class="slash">/</span></div>
+      <div class="start-subtitle">HAZARD SIMULATOR · MINE 04 · LEVEL −240 M</div>
+      <div class="start-status">
+        <span class="status-dot"></span>
+        16/16 SENSOR NODES READY · AI COPILOT ONLINE
+      </div>
+      <p class="start-desc">
+        Walk the mine and inject incidents from the <b>Simulation Control</b> console —
+        <span class="t-methane">methane</span>, <span class="t-water">water logging</span> or <span class="t-fire">fire</span> —
+        anywhere, at any severity. Watch the sensor network pick them up and the AI respond.
+      </p>
+      <button id="enterMineBtn" type="button">[ ENTER MINE ]</button>
+      <div class="start-controls">
+        <span><kbd>W A S D</kbd> MOVE</span>
+        <span><kbd>MOUSE</kbd> LOOK</span>
+        <span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> INCIDENTS</span>
+        <span><kbd>0</kbd> STOP ALL</span>
+        <span><kbd>G</kbd> PLACE AT AIM</span>
+        <span><kbd>P</kbd> PAUSE SIM</span>
+        <span><kbd>H</kbd> HIDE HUD</span>
+        <span><kbd>M</kbd> MUTE</span>
+      </div>
+      <div class="start-controls pad-row">
+        <span>CONTROLLER:</span>
+        <span><kbd class="pad-sys">L</kbd> MOVE</span>
+        <span><kbd class="pad-sys">R</kbd> LOOK</span>
+        <span><kbd class="pad-y">Y</kbd><kbd class="pad-x">X</kbd><kbd class="pad-b">B</kbd> METHANE · WATER · FIRE</span>
+        <span><kbd class="pad-a">A</kbd> PLACE</span>
+        <span><kbd class="pad-sys">⧉</kbd> STOP ALL</span>
+        <span><kbd class="pad-sys">☰</kbd> START / PAUSE</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hudContainer">
+
+    <header class="hud-header">
+      <div class="brand-block">
+        <div class="brand">MINE SENTINEL <span class="slash">/</span></div>
+        <div class="brand-sub">HAZARD<br>SIMULATOR</div>
+      </div>
+      <canvas id="compass" width="280" height="30"></canvas>
+      <div class="header-data">
+        <span><i class="live-dot"></i><b id="nodesConnected">16/16</b> NODES</span>
+        <span>SIM <b id="simClock">00:00</b> <b id="simStatus" class="sim-live">LIVE 1×</b></span>
+        <button id="btnDashboard" type="button" title="Open the operations dashboard in a new window">▣ DASHBOARD ↗</button>
+        <span id="padState">◉ CONTROLLER</span>
+        <span id="audioState">♪ ON <kbd>M</kbd></span>
+        <span id="clock">00:00:00 UTC</span>
+      </div>
+    </header>
+
+    <!-- ALERT BANNER -->
+    <section id="alertBanner" class="level-normal">
+      <button id="alertToggle" type="button" class="alert-line">
+        <i class="alert-dot"></i>
+        <span id="alertKind">ALL SYSTEMS NOMINAL</span>
+        <span id="alertHeadline">No active alerts</span>
+        <span id="alertLocation">16 / 16 NODES</span>
+        <span id="alertMore">+0</span>
+        <span class="alert-caret">▾ <kbd>E</kbd></span>
+      </button>
+      <div id="alertDetails" class="hidden">
+        <p id="alertDetail">AI copilot is monitoring the sensor network.</p>
+        <div class="pipeline">
+          <div id="stageSensor" class="stage">
+            <div class="stage-label">SENSOR →</div>
+            <div class="stage-text" id="stageSensorText">—</div>
+            <div class="stage-time" id="stageSensorTime">--:--:--.-</div>
+          </div>
+          <div id="stageAi" class="stage">
+            <div class="stage-label">AI RESULT →</div>
+            <div class="stage-text" id="stageAiText">—</div>
+            <div class="stage-time" id="stageAiTime">--:--:--.-</div>
+          </div>
+          <div id="stageResponse" class="stage">
+            <div class="stage-label">RESPONSE</div>
+            <div class="stage-text" id="stageResponseText">—</div>
+            <div class="stage-time" id="stageResponseTime">--:--:--.-</div>
+          </div>
+        </div>
+        <ul id="alertList"></ul>
+        <div class="details-head">EVENT LOG · <span id="eventCount">0</span></div>
+        <ol id="eventLog"></ol>
+      </div>
+    </section>
+
+    <!-- LEFT COLUMN -->
+    <div class="hud-col left">
+      <section id="mapPanel" class="hud-panel" data-panel="map">
+        <button class="panel-head" type="button">
+          <span class="ph-title">Mine map</span><span class="head-right">N → <i class="chev">▾</i></span>
+        </button>
+        <div class="panel-body">
+          <canvas id="minimap"></canvas>
+          <div class="map-legend">
+            <span><i class="lg gas"></i>GAS</span>
+            <span><i class="lg water"></i>WATER</span>
+            <span><i class="lg fire"></i>FIRE</span>
+            <span><i class="lg route"></i>ROUTE</span>
+          </div>
+          <div class="map-hint"><span>● air · ■ floor unit</span><span>click map to place</span></div>
+        </div>
+      </section>
+
+      <section id="sensorPanel" class="hud-panel" data-panel="sensors">
+        <button class="panel-head" type="button">
+          <span class="ph-title">Sensor <b id="matrixNode">G-12 · TUNNEL B</b></span><span class="head-right"><span id="nodeLevel" class="pill ok">Nominal</span> <i class="chev">▾</i></span>
+        </button>
+        <div class="panel-body">
+          <div class="ph-sub"><span id="matrixMount">FLOOR UNIT</span><span>Now · Δ 60 s · trend</span></div>
+          <table class="matrix">
+            <tbody>
+              <tr id="rowMethane"><td class="name">CH₄</td><td class="cur"><b data-val>—</b><small>ppm</small></td><td class="chg" data-chg>—</td><td><canvas class="spark"></canvas></td></tr>
+              <tr id="rowCo"><td class="name">CO</td><td class="cur"><b data-val>—</b><small>ppm</small></td><td class="chg" data-chg>—</td><td><canvas class="spark"></canvas></td></tr>
+              <tr id="rowTemperature"><td class="name">Temp</td><td class="cur"><b data-val>—</b><small>°C</small></td><td class="chg" data-chg>—</td><td><canvas class="spark"></canvas></td></tr>
+              <tr id="rowWater"><td class="name">Water</td><td class="cur"><b data-val>—</b><small>cm</small></td><td class="chg" data-chg>—</td><td><canvas class="spark"></canvas></td></tr>
+            </tbody>
+          </table>
+          <div class="panel-foot"><span id="nodeFooter">Battery —% · link OK</span><span>2 Hz</span></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="hud-col right">
+      <section id="vitalsPanel" class="hud-panel" data-panel="vitals">
+        <button class="panel-head" type="button">
+          <span class="ph-title">Personnel <b>P-01</b></span><span class="head-right"><span id="vitalsStatus" class="pill ok">Nominal</span> <i class="chev">▾</i></span>
+        </button>
+        <div class="panel-body vitals">
+          <div class="vital" id="vitalOxygen"><span class="v-name">O₂</span><div class="v-bar"><i id="barOxygen"></i><em style="--t: 90%"></em></div><b id="vOxygen">98</b><small>%</small></div>
+          <div class="vital" id="vitalExposure"><span class="v-name">Dose</span><div class="v-bar"><i id="barExposure"></i><em style="--t: 50%"></em></div><b id="vExposure">00</b><small>/100</small></div>
+          <div class="vital" id="vitalHeat"><span class="v-name">Heat</span><div class="v-bar"><i id="barHeat"></i><em style="--t: 40%"></em></div><b id="vHeat">27</b><small>°C</small></div>
+        </div>
+      </section>
+
+      <section id="evacPanel" class="hud-panel" data-panel="evac">
+        <button class="panel-head" type="button">
+          <span class="ph-title">Evacuation</span><span class="head-right"><span id="evacBadge" class="pill">Standby</span> <i class="chev">▾</i></span>
+        </button>
+        <div class="panel-body">
+          <div class="evac-main">
+            <div>
+              <div id="evacTitle">Route on standby</div>
+              <div class="evac-sub">→ <span id="evacTarget">Junction A</span></div>
+            </div>
+            <div class="evac-dist"><b id="evacDistance">--</b><small>m</small></div>
+          </div>
+          <ol id="evacSteps" class="steps">
+            <li id="step1"><span class="step-no">1</span><span class="step-text">Leave the hazard area</span></li>
+            <li id="step2"><span class="step-no">2</span><span class="step-text">Follow the marked route</span></li>
+            <li id="step3"><span class="step-no">3</span><span class="step-text">Confirm safe air</span></li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="aiPanel" class="hud-panel" data-panel="ai">
+        <button class="panel-head" type="button">
+          <span class="ph-title">AI reasoning</span><span class="head-right"><i class="chev">▾</i></span>
+        </button>
+        <div class="panel-body">
+          <ul id="aiTrace"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- SIMULATION CONSOLE -->
+    <section id="simConsole">
+      <div class="sc-head">
+        <span class="sc-title"><i class="rec-dot"></i>SIMULATION CONTROL</span>
+        <div class="sc-transport">
+          <button id="simPause" type="button" title="Pause / resume simulation (P)">❚❚</button>
+          <div class="seg" id="simSpeed">
+            <button type="button" data-speed="1" class="on">1×</button>
+            <button type="button" data-speed="2">2×</button>
+            <button type="button" data-speed="4">4×</button>
+          </div>
+          <button id="btnHud" type="button" title="Hide HUD panels (H)">HUD <kbd>H</kbd></button>
+        </div>
+      </div>
+      <div class="sc-main">
+        <button type="button" class="inc-btn methane" data-type="methane"><i>◆</i><b>METHANE</b><span>RISING</span><kbd class="k">1</kbd><kbd class="p pad-y">Y</kbd></button>
+        <button type="button" class="inc-btn water" data-type="water"><i>▼</i><b>WATER</b><span>LOGGING</span><kbd class="k">2</kbd><kbd class="p pad-x">X</kbd></button>
+        <button type="button" class="inc-btn fire" data-type="fire"><i>▲</i><b>FIRE</b><span>ALERT</span><kbd class="k">3</kbd><kbd class="p pad-b">B</kbd></button>
+        <button type="button" class="inc-btn stop" id="simStop" title="Stop every incident immediately (0)"><i>■</i><b>STOP ALL</b><span>END INCIDENTS</span><kbd class="k">0</kbd><kbd class="p pad-sys">⧉</kbd></button>
+        <div class="sc-params">
+          <label class="sc-field"><span>LOCATION</span><select id="simLocation"></select></label>
+          <div class="sc-field">
+            <span>PLACE</span>
+            <div class="sc-place"><button id="simAim" type="button">◎ AT AIM <kbd class="k">G</kbd><kbd class="p pad-a">A</kbd></button><span class="hint">or click map</span></div>
+          </div>
+          <div class="sc-field">
+            <span>SEVERITY</span>
+            <div class="seg" id="simSeverity">
+              <button type="button" data-sev="low">LOW</button>
+              <button type="button" data-sev="medium" class="on">MED</button>
+              <button type="button" data-sev="high">HIGH</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sc-active">
+        <ul id="activeIncidents"></ul>
+      </div>
+      <div class="pad-legend">
+        <span><kbd class="pad-dpad">◀▶</kbd> location</span>
+        <span><kbd class="pad-sys">LB</kbd><kbd class="pad-sys">RB</kbd> severity</span>
+        <span><kbd class="pad-sys">RT</kbd> speed</span>
+        <span><kbd class="pad-sys">LT</kbd> sprint</span>
+        <span><kbd class="pad-sys">☰</kbd> pause</span>
+        <span><kbd class="pad-dpad">▲</kbd> alert · <kbd class="pad-dpad">▼</kbd> HUD</span>
+      </div>
+    </section>
+
+    <div id="worldLabels">
+      <div id="labelRoute" class="world-label route hidden">
+        <div class="wl-kicker"><span class="wl-arrow">➜</span> <span id="labelRouteKicker">SAFE RETURN ROUTE</span></div>
+        <div class="wl-main"><span id="labelRouteName">JUNCTION A</span> <b id="labelRouteDist">42</b><small>m</small></div>
+      </div>
+      <div id="incidentLabels"></div>
+    </div>
+
+    <div id="inspectTip" class="hidden"></div>
+    <div id="toast" class="hidden"></div>
+    <div id="crosshair"></div>
+  </div>
+
+  <div id="startupError"></div>
+
+  <script>
+    // Runs even when the module fails to load (e.g. opened via file://).
+    document.getElementById('enterMineBtn').addEventListener('click', function () {
+      if (window.MINE_GAME && window.MINE_GAME.isInitialized) return;
+      var err = document.getElementById('startupError');
+      err.style.display = 'block';
+      err.textContent = location.protocol === 'file:'
+        ? 'Open through a local server: run "npm run dev" and visit http://localhost:8000/public/'
+        : 'Simulator failed to load. Check the browser console for errors.';
+    });
+  </script>
+  <script type="module" src="../src/main.js"></script>
+</body>
+
+</html>

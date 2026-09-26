@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Mine Sentinel - Sensor operations dashboard (live USB sensor unit + mine network)">
+  <title>MINE SENTINEL · Sensor Operations</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/dashboard.css">
+</head>
+
+<body>
+  <header class="top">
+    <div class="brand">MINE SENTINEL <span class="slash">/</span> <span class="brand-sub">SENSOR OPERATIONS</span></div>
+    <div id="srcState" class="src-state none"><i></i><span>NO BOARD</span></div>
+    <div class="top-actions">
+      <button id="btnConnect" type="button" class="primary" title="Connect the sensor board (Shift+click to list every serial port)">⏚ Connect USB</button>
+      <button id="btnCalibrate" type="button">◎ Calibrate</button>
+      <button id="btnSettings" type="button">⚙ Settings</button>
+      <button id="btnCsv" type="button">⤓ CSV</button>
+      <button id="btnReport" type="button">⎙ Report</button>
+    </div>
+    <div class="top-meta">
+      <span>SESSION <b id="sessionClock">00:00</b></span>
+      <span id="utcClock">--:--:-- UTC</span>
+    </div>
+  </header>
+
+  <div id="serialNotice" class="notice hidden"></div>
+  <button id="lossBanner" type="button" class="loss-banner hidden"><i></i><span id="lossBannerText">Sensor disconnected</span><b>View & confirm area ›</b></button>
+  <div id="calibBanner" class="calib hidden">
+    <b id="calibTitle">Calibrating in clean air…</b> keep the gas sensor away from any gas source.
+    <div class="bar"><i id="calibBar"></i></div>
+    <span id="calibText">0 / 10 s</span>
+  </div>
+
+  <main class="grid">
+    <section class="kpis">
+      <div class="kpi" id="kpiUnit"><span>Physical unit</span><b>—</b><small>—</small></div>
+      <div class="kpi" id="kpiAlarms"><span>Active alarms</span><b>0</b><small>none active</small></div>
+      <div class="kpi" id="kpiNodes"><span>Nodes alarming</span><b>0/16</b><small>—</small></div>
+      <div class="kpi" id="kpiPeakGas"><span>Peak CO</span><b>—</b><small>session max</small></div>
+      <div class="kpi" id="kpiPeakHum"><span>Peak humidity</span><b>—</b><small>session max</small></div>
+      <div class="kpi" id="kpiLink"><span>Data link</span><b>—</b><small>—</small></div>
+    </section>
+
+    <!-- PHYSICAL UNIT -->
+    <section class="card unit-card" id="unitCard">
+      <div class="card-head">
+        <h2>Physical unit PU-01 <span id="unitTitle">G-13 · Tunnel B</span></h2>
+        <span id="unitMeta" class="dim">—</span>
+      </div>
+      <div class="metrics">
+        <div class="metric" id="m_gas">
+          <div class="m-head"><span>Carbon monoxide (CO)</span><i class="src">—</i></div>
+          <canvas></canvas>
+          <div class="m-value"><b class="value">—</b><small>ppm</small></div>
+          <div class="sub">—</div>
+        </div>
+        <div class="metric" id="m_hum">
+          <div class="m-head"><span>Humidity</span><i class="src">—</i></div>
+          <canvas></canvas>
+          <div class="m-value"><b class="value">—</b><small>%RH</small></div>
+          <div class="sub">—</div>
+        </div>
+        <div class="metric" id="m_pres">
+          <div class="m-head"><span>Air pressure</span><i class="src">—</i></div>
+          <canvas></canvas>
+          <div class="m-value"><b class="value">—</b><small>hPa</small></div>
+          <div class="sub">—</div>
+        </div>
+        <div class="metric" id="m_water">
+          <div class="m-head"><span>Water level</span><i class="src">—</i></div>
+          <canvas></canvas>
+          <div class="m-value"><b class="value">—</b><small>cm</small></div>
+          <div class="sub">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ANALYSIS -->
+    <section class="card analysis-card">
+      <div class="card-head"><h2>Analysis</h2><span id="anPill" class="pill ok">Normal</span></div>
+      <div id="anHeadline" class="an-headline">Waiting for data</div>
+      <div id="anAdvice" class="an-advice">—</div>
+      <div class="conf"><span>% of CO alarm level</span><div class="bar"><i id="anLel"></i></div></div>
+      <ul id="anLines" class="trace"></ul>
+    </section>
+
+    <!-- MAP -->
+    <section class="card map-card">
+      <div class="card-head">
+        <h2>Mine sensor network</h2>
+        <div class="legend">
+          <span><i class="ring"></i>physical unit</span>
+          <span><i class="dot air"></i>arch unit</span>
+          <span><i class="sq"></i>floor unit</span>
+          <span><i class="sw gas"></i>gas</span>
+          <span><i class="sw water"></i>water</span>
+          <span class="dim">N →</span>
+        </div>
+      </div>
+      <div class="map-wrap">
+        <canvas id="mapCanvas"></canvas>
+        <div id="mapTip" class="tip hidden"></div>
+      </div>
+    </section>
+
+    <!-- SERIAL CONSOLE -->
+    <section class="card console-card">
+      <div class="card-head">
+        <h2>Serial console</h2>
+        <div class="filters">
+          <button id="btnPauseConsole" type="button">Pause</button>
+          <button id="btnClearConsole" type="button">Clear</button>
+        </div>
+      </div>
+      <ol id="consoleLines" class="console"></ol>
+      <div class="console-hint">Expected one line per reading, e.g. <code>{"gas":412,"hum":55.2,"temp":27.1}</code> or <code>gas=412,hum=55.2</code>. Optional keys <code>pres</code> and <code>water</code> switch those readings to live.</div>
+    </section>
+
+    <!-- SENSOR GRID -->
+    <section class="card sensors-card">
+      <div class="card-head"><h2>All nodes</h2><span class="dim">click a node to chart it</span></div>
+      <div id="sensorGrid" class="sensor-grid"></div>
+    </section>
+
+    <!-- TRENDS -->
+    <section class="card trends-card">
+      <div class="card-head">
+        <h2>Trends · <span id="trendNode">G-13</span></h2>
+        <span class="dim">last 5 min · all nodes faint, selected bright</span>
+      </div>
+      <div class="charts">
+        <div class="chart"><div class="chart-label">Carbon monoxide <small>ppm</small><b id="cv_gas"></b></div><canvas data-metric="gas"></canvas></div>
+        <div class="chart"><div class="chart-label">Humidity <small>%RH</small><b id="cv_hum"></b></div><canvas data-metric="hum"></canvas></div>
+        <div class="chart"><div class="chart-label">Air pressure <small>hPa</small><b id="cv_pres"></b></div><canvas data-metric="pres"></canvas></div>
+        <div class="chart"><div class="chart-label">Water level <small>cm</small><b id="cv_water"></b></div><canvas data-metric="water"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ALARMS -->
+    <section class="card alarms-card">
+      <div class="card-head"><h2>Alarms</h2><span id="alarmCount" class="dim">0 this session</span></div>
+      <canvas id="timeline"></canvas>
+      <table class="inc-table">
+        <thead><tr><th>Metric</th><th>Node</th><th>Zone</th><th>Level</th><th>Start</th><th>Duration</th><th>Peak</th><th>Status</th></tr></thead>
+        <tbody id="alarmRows"></tbody>
+      </table>
+    </section>
+
+    <!-- EVENTS -->
+    <section class="card events-card">
+      <div class="card-head">
+        <h2>Event log</h2>
+        <div id="eventFilters" class="filters">
+          <button type="button" data-f="all" class="on">All</button>
+          <button type="button" data-f="crit">Critical</button>
+          <button type="button" data-f="warn">Warnings</button>
+          <button type="button" data-f="link">Link</button>
+        </div>
+      </div>
+      <ol id="eventList" class="events"></ol>
+    </section>
+  </main>
+
+  <!-- SETTINGS -->
+  <dialog id="settingsDlg">
+    <form method="dialog" id="settingsForm">
+      <h2>Settings</h2>
+      <fieldset>
+        <legend>Hardware link</legend>
+        <label>Baud rate<select name="baud"><option>9600</option><option>57600</option><option>115200</option></select></label>
+        <label>Board ADC<select name="adcMax"><option value="4095">12-bit · ESP32 (0–4095, 3.3 V)</option><option value="1023">10-bit · Arduino Uno / Nano (0–1023, 5 V)</option></select></label>
+        <label>Gas module supply (V)<select name="sensorVcc"><option value="5">5 V (VIN / 5V pin)</option><option value="3.3">3.3 V (3V3 pin)</option></select></label>
+        <label>Gas sensor<select name="sensorModel"></select></label>
+        <label>Physical unit location<select name="physicalNode"></select></label>
+      </fieldset>
+      <fieldset>
+        <legend>Alarm thresholds</legend>
+        <label>CO warning (ppm)<input name="gasWarn" type="number" min="1" step="1"></label>
+        <label>CO alarm (ppm)<input name="gasAlarm" type="number" min="1" step="1"></label>
+        <label>Humidity warning (%RH)<input name="humWarn" type="number" min="1" max="100"></label>
+        <label>Humidity alarm (%RH)<input name="humAlarm" type="number" min="1" max="100"></label>
+        <label>Water warning (cm)<input name="waterWarn" type="number" min="1"></label>
+        <label>Water alarm (cm)<input name="waterAlarm" type="number" min="1"></label>
+      </fieldset>
+      <fieldset>
+        <legend>Gas calibration</legend>
+        <p id="calStatus" class="dim">—</p>
+        <button type="button" id="btnResetCal">Reset to uncalibrated estimate</button>
+      </fieldset>
+      <div class="dlg-actions">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button value="save" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- SENSOR SIGNAL LOSS -->
+  <dialog id="lossDlg" class="loss">
+    <div class="loss-head">
+      <div class="loss-icon">!</div>
+      <div>
+        <h2 id="lossTitle">Sensor disconnected</h2>
+        <p id="lossSub">—</p>
+      </div>
+    </div>
+    <div class="loss-body">
+      <div class="loss-left">
+        <canvas id="lossMap"></canvas>
+        <div id="lossLocation" class="loss-grid"></div>
+      </div>
+      <div class="loss-right">
+        <div id="lossRisk" class="loss-risk">—</div>
+        <h3>Last readings before contact was lost</h3>
+        <div id="lossLast" class="loss-grid four"></div>
+        <h3>Neighbouring sensors on the same cable</h3>
+        <ul id="lossNeighbours" class="loss-neighbours"></ul>
+        <h3>Response</h3>
+        <ol class="loss-steps">
+          <li>Call the section supervisor and anyone working in this area by radio.</li>
+          <li>Send an inspection team with gas detectors and self-rescuers.</li>
+          <li>Record the outcome below.</li>
+        </ol>
+      </div>
+    </div>
+    <div class="loss-actions">
+      <button id="lossDispatch" type="button" class="warn">Dispatch inspection team</button>
+      <button id="lossClear" type="button" class="ok">Area checked · no casualties</button>
+      <span class="loss-cas"><input id="lossCount" type="number" min="1" value="1" aria-label="Number of casualties"><button id="lossCasualty" type="button" class="crit">Report casualties</button></span>
+      <button id="lossAck" type="button">Acknowledge</button>
+    </div>
+  </dialog>
+
+  <section id="report" class="report"></section>
+
+  <script type="module" src="../src/dashboard/main.js"></script>
+</body>
+
+</html>
